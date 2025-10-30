@@ -1061,7 +1061,7 @@ void ASTJsonExporter::printAST(std::ostream& _stream, ASTNode const& _node, util
 {
 	Json::Value json_value = toJson(_node);
 	std::map<Json::Value::Int, Json::String> variable_map;
-	// _stream << util::jsonPrint(extractRweSet(json_value), util::JsonFormat{ util::JsonFormat::Pretty }) << std::endl;
+	_stream << util::jsonPrint(extractRweSet(json_value), util::JsonFormat{ util::JsonFormat::Pretty }) << std::endl;
 	
 	for (auto const& node: json_value["nodes"][1]["nodes"])
 	{
@@ -1075,6 +1075,7 @@ void ASTJsonExporter::printAST(std::ostream& _stream, ASTNode const& _node, util
 		_stream << iter->first << " " << iter->second << std::endl;
 	}
 	std::vector<Json::String> allReferencedDeclarations;
+	extractRweSet(json_value);
 	findAllReferencedDeclarations(json_value, allReferencedDeclarations);
 	parseReferencedDeclaration(allReferencedDeclarations, variable_map);
 	_stream << std::endl;

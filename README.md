@@ -1,92 +1,117 @@
-# The Solidity Contract-Oriented Programming Language
-
-[![Matrix Chat](https://img.shields.io/badge/Matrix%20-chat-brightgreen?style=plastic&logo=matrix)](https://matrix.to/#/#ethereum_solidity:gitter.im)
-[![Gitter Chat](https://img.shields.io/badge/Gitter%20-chat-brightgreen?style=plastic&logo=gitter)](https://gitter.im/ethereum/solidity)
-[![Solidity Forum](https://img.shields.io/badge/Solidity_Forum%20-discuss-brightgreen?style=plastic&logo=discourse)](https://forum.soliditylang.org/)
-[![X Follow](https://img.shields.io/twitter/follow/solidity_lang?style=plastic&logo=x)](https://X.com/solidity_lang)
-[![Mastodon Follow](https://img.shields.io/mastodon/follow/000335908?domain=https%3A%2F%2Ffosstodon.org%2F&logo=mastodon&style=plastic)](https://fosstodon.org/@solidity)
-
-You can talk to us on Gitter and Matrix, tweet at us on X (previously Twitter) or create a new topic in the Solidity forum. Questions, feedback, and suggestions are welcome!
-
-Solidity is a statically typed, contract-oriented, high-level language for implementing smart contracts on the Ethereum platform.
-
-For a good overview and starting point, please check out the official [Solidity Language Portal](https://soliditylang.org).
-
-## Table of Contents
-
-- [Background](#background)
-- [Build and Install](#build-and-install)
-- [Example](#example)
-- [Documentation](#documentation)
-- [Development](#development)
-- [Maintainers](#maintainers)
-- [License](#license)
-- [Security](#security)
+# Static Analysis Tool for Solidity Smart Contracts
 
 ## Background
 
-Solidity is a statically-typed curly-braces programming language designed for developing smart contracts
-that run on the Ethereum Virtual Machine. Smart contracts are programs that are executed inside a peer-to-peer
-network where nobody has special authority over the execution, and thus they allow anyone to implement tokens of value,
-ownership, voting, and other kinds of logic.
+This fork of Solidity Compiler traverses Solidity AST and serializes nodes to JSON while preserving annotations such as types and referencedDeclaration ids. 
 
-When deploying contracts, you should use the latest released version of
-Solidity. This is because breaking changes, as well as new features and bug fixes, are
-introduced regularly. We currently use a 0.x version
-number [to indicate this fast pace of change](https://semver.org/#spec-item-4).
+The analysis first collects state-variable and function declarations, then inspects expressions and statements (Identifiers, MemberAccess, IndexAccess, Assignments, FunctionCalls) to classify occurrences as reads or writes by syntactic position (RHS vs LHS) and contextual cues.
+
+To handle storage aliases it tracks storage-reference variables and resolves referencedDeclaration ids to concrete state variables, and it aggregates per-function read/write sets while accounting for modifiers, external calls, and merged execution sequences.
+
+The pipeline finally filters duplicates and likely false positives and emits a contract-level JSON summary of read/write and external read/write sets.
 
 ## Build and Install
 
 Instructions about how to build and install the Solidity compiler can be
 found in the [Solidity documentation](https://docs.soliditylang.org/en/latest/installing-solidity.html#building-from-source).
 
+Need to create rwSet directoty for .json output.
+```
+cd ast-static-analysis
+mkdir reSet
+``` 
 
 ## Example
 
-A "Hello World" program in Solidity is of even less use than in other languages, but still:
-
+A hotel booking program in Solidity:
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.6.0 <0.9.0;
+pragma solidity ^0.8.23;
 
-contract HelloWorld {
-    function helloWorld() external pure returns (string memory) {
-        return "Hello, World!";
-    }
+contract HotelBooking {
+  uint256 public constant MAX_ROOMS = 5;
+  uint256 public constant HOTEL_PRICE = 20000;
+  address public immutable paymentService;
+  uint256 public roomReserved;
+  address[MAX_ROOMS] public rooms;
+
+  constructor(address _paymentService) {
+    paymentService = _paymentService;
+  }
+
+  function checkRoomAvailability(address account, uint payment) public view returns (bool roomAvailability) {
+    (bool success, bytes memory data) = paymentService.staticcall(abi.encodeWithSignature("verifyDeposit(address,uint256)", account, payment));
+    require(success, "Payment Check Failed");
+
+    bool depositAvailable = abi.decode(data, (bool));
+    roomAvailability = (roomReserved < MAX_ROOMS && payment >= HOTEL_PRICE && depositAvailable == true);
+  }
+
+  function bookHotel(address account) public {
+    (bool success, ) = paymentService.call(abi.encodeWithSignature("receivePayment(address,uint256)", account, HOTEL_PRICE));
+    require(success, "Payment Failed");
+    rooms[roomReserved++] = account;
+  }
 }
 ```
 
-To get started with Solidity, you can use [Remix](https://remix.ethereum.org/), which is a
-browser-based IDE. Here are some example contracts:
-
-1. [Voting](https://docs.soliditylang.org/en/latest/solidity-by-example.html#voting)
-2. [Blind Auction](https://docs.soliditylang.org/en/latest/solidity-by-example.html#blind-auction)
-3. [Safe remote purchase](https://docs.soliditylang.org/en/latest/solidity-by-example.html#safe-remote-purchase)
-4. [Micropayment Channel](https://docs.soliditylang.org/en/latest/solidity-by-example.html#micropayment-channel)
+Output of read/write set ststic analysis for HotelBooking smart contract:
+```
+4 MAX_ROOMS
+7 HOTEL_PRICE
+9 paymentService
+11 roomReserved
+15 rooms
+function: 4 uses global variable: MAX_ROOMS
+function: constructor uses global variable: paymentService
+function: checkRoomAvailability uses global variable: paymentService roomReserved MAX_ROOMS HOTEL_PRICE
+function: bookHotel uses global variable: HOTEL_PRICE paymentService rooms roomReserved
+```
+```json
+[
+	{
+		"externalRweSet" : [],
+		"function" : "(address)",
+		"functionSelector" : "",
+		"readSet" : [],
+		"writeSet" : []
+	},
+	{
+		"externalRweSet" : 
+		[
+			{
+				"name" : "verifyDeposit(address,uint256)",
+				"type" : "execute"
+			}
+		],
+		"function" : "checkRoomAvailability(address,uint256)",
+		"functionSelector" : "fa864572",
+		"readSet" : 
+		[
+			"roomReserved"
+		],
+		"writeSet" : []
+	},
+	{
+		"externalRweSet" : 
+		[
+			{
+				"name" : "receivePayment(address,uint256)",
+				"type" : "execute"
+			}
+		],
+		"function" : "bookHotel(address)",
+		"functionSelector" : "165fcb2d",
+		"readSet" : [],
+		"writeSet" : 
+		[
+			"roomReserved",
+			"rooms"
+		]
+	}
+]
+```
 
 ## Documentation
 
 The Solidity documentation is hosted using [Read the Docs](https://docs.soliditylang.org).
-
-## Development
-
-Solidity is still under development. Contributions are always welcome!
-Please follow the
-[Developers Guide](https://docs.soliditylang.org/en/latest/contributing.html)
-if you want to help.
-
-You can find our current feature and bug priorities for forthcoming
-releases in the [projects section](https://github.com/ethereum/solidity/projects).
-
-## Maintainers
-The Solidity programming language and compiler are open-source community projects governed by a core team.
-The core team is sponsored by the [Ethereum Foundation](https://ethereum.foundation/).
-
-## License
-Solidity is licensed under [GNU General Public License v3.0](LICENSE.txt).
-
-Some third-party code has its [own licensing terms](cmake/templates/license.h.in).
-
-## Security
-
-The security policy may be [found here](SECURITY.md).

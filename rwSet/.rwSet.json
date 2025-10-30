@@ -1,0 +1,38 @@
+[
+    {
+        "externalRweSet": [],
+        "function": "(address)",
+        "functionSelector": "",
+        "readSet": [],
+        "writeSet": []
+    },
+    {
+        "externalRweSet": [
+            {
+                "name": "verifyDeposit(address,uint256)",
+                "type": "execute"
+            }
+        ],
+        "function": "checkRoomAvailability(address,uint256)",
+        "functionSelector": "fa864572",
+        "readSet": [
+            "roomReserved"
+        ],
+        "writeSet": []
+    },
+    {
+        "externalRweSet": [
+            {
+                "name": "receivePayment(address,uint256)",
+                "type": "execute"
+            }
+        ],
+        "function": "bookHotel(address)",
+        "functionSelector": "165fcb2d",
+        "readSet": [],
+        "writeSet": [
+            "roomReserved",
+            "rooms"
+        ]
+    }
+]

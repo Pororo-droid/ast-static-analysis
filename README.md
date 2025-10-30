@@ -15,12 +15,16 @@ The pipeline finally filters duplicates and likely false positives and emits a c
 Instructions about how to build and install the Solidity compiler can be
 found in the [Solidity documentation](https://docs.soliditylang.org/en/latest/installing-solidity.html#building-from-source).
 
-Need to create rwSet directoty for .json output.
+## How to Use
 ```
-cd ast-static-analysis
-mkdir reSet
-``` 
-
+cd ast-static-analysis/build/solc
+```
+```
+mv <YourContract.sol> .
+```
+```
+./solc <YourContract.sol>
+```
 ## Example
 
 A hotel booking program in Solidity:
@@ -55,7 +59,7 @@ contract HotelBooking {
 }
 ```
 
-Output of read/write set ststic analysis for HotelBooking smart contract:
+Output of read/write set static analysis for HotelBooking smart contract:
 ```
 4 MAX_ROOMS
 7 HOTEL_PRICE
